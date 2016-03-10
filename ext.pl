@@ -25,7 +25,6 @@ format is more organized then the lef files.
     - First argument    # start point
     - Second argument   # end point
     - Third argument    # step size
-    - Last argument     # def file name
 
     example:
         ./ext.pl 0 100 10 # sampling data from the first 10x10 square to the top
@@ -45,8 +44,7 @@ for ( $xdownlimit = $ARGV[0] ; $xdownlimit <= $ARGV[1] ; $xdownlimit = $xdownlim
     $xuplimit       = $xdownlimit + 10 ;
     $yuplimit       = $ydownlimit + 10 ;
 
-    #$outIn          = "txt/" . "HTIn" . "x" . $xdownlimit . $xuplimit . "y" . $ydownlimit . $yuplimit . "\.txt" ;
-    $outIn          = "txt/" . $ARGV[3] . "x" . $xdownlimit . $xuplimit . "y" . $ydownlimit . $yuplimit . "\.txt" ;
+    $outIn          = "x". $xdownlimit. $xuplimit. "y". $ydownlimit. $yuplimit. "\.txt";
     open $writeFree , "+>" , $outIn or die "$outIn is not available!\n" ; 
     print $outIn . " has been successfully opened!\n" ;
 
@@ -69,7 +67,6 @@ for ( $xdownlimit = $ARGV[0] ; $xdownlimit <= $ARGV[1] ; $xdownlimit = $xdownlim
 
                 #read the all standard cell reference file
                 open $cellref , "<" , $cellinfo or die "$cellinfo is not available!\n" ;
-                #print $cellinfo . " has been successfully opened!\n" ;
 
                 while ( <$cellref> ) {
                     my @refinfo     = split ( '\t' , $_ ) ;
@@ -85,9 +82,6 @@ for ( $xdownlimit = $ARGV[0] ; $xdownlimit <= $ARGV[1] ; $xdownlimit = $xdownlim
                 #cell position limited in a square area  
                 if ( ( $cellposx > $xdownlimit ) && ( $cellposx < $xuplimit ) &&
                         ( $cellposy > $ydownlimit ) && ( $cellposy < $yuplimit ) ) {
-                    #print "found\n" ; 
-                    #print $cellname . "\t" . $cellins . "\t" . $celldir . "\t" . $cellposx . "\t" . $cellposy . "\t" . $celldir . "\t" . $refxsize . "\t" . $refysize ;
-                    #print $writeFree $cellname . "\t" . $cellins . "\t" . $cellposx . "\t" . $cellposy . "\t" . $celldir . "\t" . $refxsize . "\t" . $refysize . "\n" ;
                     &dir ( $celldir , $cellname , $cellins , $cellposx , $cellposy , $refxsize , $refysize ) ;
                 } #end if
                 close ( $cellref ) ;
