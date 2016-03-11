@@ -1,6 +1,9 @@
+import math
 import numpy as np 
 import scipy.io as sio
+import scipy.special as ssp
 import matplotlib.pyplot as plt
+import scipy.signal as ssi
 
 sig1 = sio.loadmat('batch1.mat')
 sig2 = sio.loadmat('batch2.mat')
@@ -62,6 +65,8 @@ epsilon         = 0.00001
 M               = 50
 NA              = 0.6
 
+pi              = 3.14
+
 # get bounds
 xmin            = float(min([coord[2] for coord in coords]))
 xmax            = float(max([coord[4] for coord in coords]))
@@ -97,5 +102,30 @@ for cells in coords:
                         if y_coord >= y_min_cell and y_coord <= y_max_cell:
                             RMAP[y_coord_index][x_coord_index] = colors 
 
-plt.pcolor(X,Y,RMAP)
+# generate the convolution results
+
+U = X*M;
+V = Y*M;
+ulist = xlist*M;
+vlist = ylist*M;
+
+uctr = (xmax + xmin)*M/2;
+vctr = (ymax + ymin)*M/2;
+
+P = np.sqrt(np.square((U - uctr)) + np.square((V - vctr)));
+
+Pp = NA*P/(M*lam_val);
+
+psf = (ssp.jv(1,2*pi*Pp)/np.square((2*pi*Pp)));
+
+# *** Generate Image & Normalize it *** %
+
+IMMap   = ssi.convolve2d(psf,RMAP, mode='same');
+temp    = np.ones(U.shape)
+Norm    = ssi.convolve2d(psf, temp, 'same');
+nval    = Norm.max();
+IMMapN  = IMMap/nval;
+ 
+
+plt.pcolor(X,Y,IMMapN)
 plt.show()
