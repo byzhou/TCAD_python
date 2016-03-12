@@ -1,4 +1,5 @@
 import math
+from scipy.interpolate import Rbf  
 import numpy as np 
 import scipy.io as sio
 import scipy.special as ssp
@@ -58,8 +59,8 @@ pol             = 2
 mis             = 0
 min_val         = ((3.5 - 1.45)/(3.5 + 1.45))**2
 
-xstep           = 0.1 
-ystep           = 0.1 
+xstep           = 0.2 
+ystep           = 0.25 
 epsilon         = 0.00001 
 
 M               = 50
@@ -68,64 +69,47 @@ NA              = 0.6
 pi              = 3.14
 
 # get bounds
-xmin            = float(min([coord[2] for coord in coords]))
-xmax            = float(max([coord[4] for coord in coords]))
-ymin            = float(min([coord[5] for coord in coords]))
-ymax            = float(max([coord[3] for coord in coords]))
+xmin            = float(min(min([[coord[2] for coord in coords], [coord[4] for coord in coords]])))
+xmax            = float(max(max([[coord[2] for coord in coords], [coord[4] for coord in coords]])))
+ymin            = float(min(min([[coord[3] for coord in coords], [coord[5] for coord in coords]])))
+ymax            = float(max(max([[coord[3] for coord in coords], [coord[5] for coord in coords]])))
+
+# get sampling points
+x_sampled       = []
+y_sampled       = []
+ref_sampled     = []
+for cells in coords:
+    # if the gate has only one sampling points
+    if len(cells[6]) == 1:
+        x_sampled.append((float(coord[2])+float(coord[4]))/2)
+        y_sampled.append((float(coord[3])+float(coord[5]))/2)
+        ref_sampled.append(float(coord[6]))
+    else:
+        num_of_sampling = len(cells[6])
+        x_min_cell  = float(min([cells[2], cells[4]]))
+        x_max_cell  = float(max([cells[2], cells[4]]))
+        y_min_cell  = float(min([cells[3], cells[5]]))
+        y_max_cell  = float(max([cells[3], cells[5]]))
+        x_first_sampled_point   = (x_min_cell + x_max_cell) / 2 - 0.915 * (num_of_sampling - 1) / 2
+        y_first_sampled_point   = (y_min_cell + y_max_cell) / 2 
+        
+        for color_index, colors in enumerate(cells[6]):
+            x_sampled.append(x_first_sampled_point + 0.915 * color_index)
+            y_sampled.append(y_first_sampled_point)
+            ref_sampled.append(float(colors))
 
 # setup meshes
-xlist           = list(np.arange(xmin,xmax,xstep))
-ylist           = list(np.arange(ymin,ymax,ystep))
-X, Y            = np.meshgrid(xlist, ylist)
+x_interpolate           = np.arange(xmin,xmax,xstep)
+y_interpolate           = np.arange(ymin,ymax,ystep)
+X, Y                    = np.meshgrid(x_interpolate, y_interpolate)
+print [len(x_sampled), len(y_sampled), len(ref_sampled)]
 
-# for each gate, set mesh values to the reflectance
-RMAP            = min_val*np.ones(X.shape)
-for cells in coords:
-    x_min_cell  = float(min([cells[2], cells[4]]))
-    x_max_cell  = float(max([cells[2], cells[4]]))
-    y_min_cell  = float(min([cells[3], cells[5]]))
-    y_max_cell  = float(max([cells[3], cells[5]]))
-    if len(cells[6]) == 1:
-        for x_coord_index, x_coord in enumerate(xlist):
-            if x_coord >= x_min_cell and x_coord <= x_max_cell:
-                for y_coord_index, y_coord in enumerate(ylist):
-                    if y_coord >= y_min_cell and y_coord <= y_max_cell:
-                        RMAP[y_coord_index][x_coord_index] = cells[6]
-    else:
-        total_cell_length   = x_max_cell - x_min_cell
-        each_piece_of_cell  = total_cell_length / len(cells[6])
-        for color_index, colors in enumerate(cells[6]):
-            for x_coord_index, x_coord in enumerate(xlist):
-                if (x_coord >= x_min_cell + each_piece_of_cell * color_index) and\
-                    (x_coord <= x_min_cell + each_piece_of_cell * (color_index + 1)):
-                    for y_coord_index, y_coord in enumerate(ylist):
-                        if y_coord >= y_min_cell and y_coord <= y_max_cell:
-                            RMAP[y_coord_index][x_coord_index] = colors 
+ref_interpolate_func    = Rbf(x_sampled, y_sampled, ref_sampled, method='inverse')
+ref_interpolate         = ref_interpolate_func(X, Y)
 
-# generate the convolution results
-
-U = X*M;
-V = Y*M;
-ulist = xlist*M;
-vlist = ylist*M;
-
-uctr = (xmax + xmin)*M/2;
-vctr = (ymax + ymin)*M/2;
-
-P = np.sqrt(np.square((U - uctr)) + np.square((V - vctr)));
-
-Pp = NA*P/(M*lam_val);
-
-psf = (ssp.jv(1,2*pi*Pp)/np.square((2*pi*Pp)));
-
-# *** Generate Image & Normalize it *** %
-
-IMMap   = ssi.convolve2d(psf,RMAP, mode='same');
-temp    = np.ones(U.shape)
-Norm    = ssi.convolve2d(psf, temp, 'same');
-nval    = Norm.max();
-IMMapN  = IMMap/nval;
- 
-
-plt.pcolor(X,Y,IMMapN)
+# plot
+plt.pcolor(X, Y, ref_interpolate)
+plt.colorbar()
 plt.show()
+
+
