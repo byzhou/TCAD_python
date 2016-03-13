@@ -1,5 +1,8 @@
 import json
 import math
+import sys
+import os
+import ntpath
 from tempfile import TemporaryFile
 from scipy.interpolate import Rbf  
 from scipy import interpolate
@@ -32,13 +35,18 @@ for name in data4.dtype.names:
 
 #all the lib results have been combined
 
-extracted_file  = "x1020y1020.txt"
+# extracted_file  = "c1355/TjIn/x1020y1020.txt"
+extracted_file  = sys.argv[1]
+if len(sys.argv) != 2:
+    print "Help Message"
+    print "You need to put the command in such format"
+    print "python creat_lib.py txt/c1355/TjIn/x1020y1020.txt"
 
 # Read file
 r               = 0
 x               = 0
 
-read_file       = open ('txt/'+extracted_file,'r')
+read_file       = open (extracted_file,'r')
 coords          = []
 types           = {}
 for lines in read_file:
@@ -156,7 +164,15 @@ scalar_value    = (max_val - min_val) / (max_post_interpolate - min_post_interpo
 # * scalar_value + min_val for items in row] for row in ref_interpolate])
 
 # save the matrix to a file
-imaged_matrix_file  = extracted_file[0:-3] + "npy"
+extracted_file_base_name    = ntpath.basename(extracted_file)
+extracted_file_input_path   = ntpath.dirname(extracted_file)
+extracted_file_output_path  = "npy/" + extracted_file_input_path[4:]
+if not os.path.exists(extracted_file_output_path):
+    print "Save directory does not exist! I will create it for you!"
+    os.makedirs(extracted_file_output_path)
+print "Save directory exist!"
+imaged_matrix_file  = extracted_file_output_path + "/" + extracted_file_base_name[0:-3] + "npy"
+print imaged_matrix_file
 np.save(imaged_matrix_file, ref_interpolate)
 
 # plot
@@ -171,6 +187,6 @@ plt.ylim([ymin, ymax - ystep])
 # plt.savefig(savefig_name, format='pdf', bbox_inches='tight')
 # savefig_name.close()
 
-plt.show()
-plt.close()
+#plt.show()
+#plt.close()
 

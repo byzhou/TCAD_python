@@ -14,16 +14,18 @@ $helpInfo   = << "EOF" ;
 
 Usage: Sample the square areas covered in the def file.
 
-    - First argument    size of the window frame
-    - Second argument   maximum size of the chip
+    - First argument    size of the window frame    \$ARGV[0]
+    - Second argument   maximum size of the chip    \$ARGV[1] 
+    - Third argument    file to be processed        \$ARGV[2]
+    - Fourth argument   directory to be saved       \$ARGV[3]
 
     example:
-        ./ext.pl 10 100 # sampling data from the first 10x10 square to the top
+        ./ext.pl 10 100 TjIn.def c1355 # sampling data from the first 10x10 square to the top
         lef 10x10 square
 EOF
 
 # argument number guard
-if ( $#ARGV != 1 ) {
+if ( $#ARGV != 3 ) {
     print "Number of arguement list only has ". ($#ARGV + 2). " arguments!\n";
     print $helpInfo . "\n" ;
     exit;
@@ -34,7 +36,8 @@ if ( $#ARGV != 1 ) {
 }
 
 # def file that is about to be read
-$defHTIn    = "TjIn.def" ;
+$defHTIn    = $ARGV[2] ;
+$TjFlag     = substr $defHTIn, 0, -4; 
 
 # test if the save directory exist 
 if (-d "txt") {
@@ -44,13 +47,27 @@ if (-d "txt") {
     system ("mkdir txt");
 }
 
+if (-d "txt\/$ARGV[3]") {
+    print "$ARGV[3] exists, we can write results into directory\n";
+} else {
+    print "$ARGV[3] does not exit, I will create one directory for you!\n";
+    system ("mkdir txt\/$ARGV[3]");
+}
+
+if (-d "txt\/$ARGV[3]\/$TjFlag") {
+    print "$TjFlag exists, we can write results into directory\n";
+} else {
+    print "$TjFlag does not exit, I will create one directory for you!\n";
+    system ("mkdir txt\/$ARGV[3]\/$TjFlag");
+}
+
 #write to Trojan Free file
 for ( $xdownlimit = 0 ; $xdownlimit <= $ARGV[1] ; $xdownlimit = $xdownlimit + $ARGV[0] ) {
     for ( $ydownlimit = $ARGV[0] ; $ydownlimit <= $ARGV[1] ; $ydownlimit = $ydownlimit + $ARGV[0] ) {
         $xuplimit       = $xdownlimit + 10 ;
         $yuplimit       = $ydownlimit + 10 ;
         
-        $outIn          = "txt\/". "x". $xdownlimit. $xuplimit. "y". $ydownlimit. $yuplimit. "\.txt";
+        $outIn          = "txt\/$ARGV[3]\/$TjFlag\/". "x". $xdownlimit. $xuplimit. "y". $ydownlimit. $yuplimit. "\.txt";
         open $writeFree , "+>" , $outIn or die "$outIn is not available!\n" ; 
         print $outIn . " has been successfully opened!\n" ;
 
@@ -99,7 +116,7 @@ for ( $xdownlimit = 0 ; $xdownlimit <= $ARGV[1] ; $xdownlimit = $xdownlimit + $A
     }
 }
 
-foreach $resultFiles (glob("txt/*.txt")) {
+foreach $resultFiles (glob("txt\/$ARGV[3]\/$TjFlag\/*.txt")) {
     if (-z $resultFiles) {
         print $resultFiles. " is empty! It will be removed!\n";
         system("rm ". $resultFiles);
