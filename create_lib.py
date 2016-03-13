@@ -1,10 +1,14 @@
+import json
 import math
+from tempfile import TemporaryFile
 from scipy.interpolate import Rbf  
+from scipy import interpolate
 import numpy as np 
 import scipy.io as sio
 import scipy.special as ssp
 import matplotlib.pyplot as plt
 import scipy.signal as ssi
+from matplotlib.backends.backend_pdf import PdfPages
 
 sig1 = sio.loadmat('batch1.mat')
 sig2 = sio.loadmat('batch2.mat')
@@ -46,8 +50,17 @@ for lines in read_file:
                     coord_Array[6], 
                     coord_Array[7]])
     types.update({coord_Array[0]:0})
+
+# print in the format of json
+# print json.dumps(coords, indent=4)
+
 # put all the information into the coords
 for cell_info in coords:
+    if cell_info[1] == 'FILLCELL_X1' or cell_info[1] == 'FILLCELL_X2' or cell_info[1] == 'FILLCELL_X4' or\
+        cell_info[1] == 'FILLCELL_X8' or cell_info[1] == 'FILLCELL_X16' or cell_info[1] == 'FILLCELL_X32':
+        cell_info.append(np.ones(len((ref_lib[cell_info[1]][0]))))
+    else:
+        cell_info.append(ref_lib[cell_info[1]][0])
     cell_info.append(ref_lib[cell_info[1]][0])
 # types is to determine the number of types
 read_file.close()
@@ -58,9 +71,10 @@ pol             = 2
 
 mis             = 0
 min_val         = ((3.5 - 1.45)/(3.5 + 1.45))**2
+max_val         = 1
 
-xstep           = 0.2 
-ystep           = 0.25 
+xstep           = 0.1 
+ystep           = 0.1
 epsilon         = 0.00001 
 
 M               = 50
@@ -79,20 +93,40 @@ x_sampled       = []
 y_sampled       = []
 ref_sampled     = []
 for cells in coords:
+    # gates that smaller than 915 nm
+    # if abs(float(cells[2]) - float(cells[4])) < 0.915:
+    #     print cells[1]
     # if the gate has only one sampling points
     if len(cells[6]) == 1:
-        x_sampled.append((float(coord[2])+float(coord[4]))/2)
-        y_sampled.append((float(coord[3])+float(coord[5]))/2)
-        ref_sampled.append(float(coord[6]))
+        x_sampled.append((float(cells[2])+float(cells[4]))/2)
+        y_sampled.append((float(cells[3])+float(cells[5]))/2)
+        ref_sampled.append(float(cells[6]))
     else:
-        num_of_sampling = len(cells[6])
         x_min_cell  = float(min([cells[2], cells[4]]))
         x_max_cell  = float(max([cells[2], cells[4]]))
         y_min_cell  = float(min([cells[3], cells[5]]))
         y_max_cell  = float(max([cells[3], cells[5]]))
+        num_of_sampling = len(cells[6])
         x_first_sampled_point   = (x_min_cell + x_max_cell) / 2 - 0.915 * (num_of_sampling - 1) / 2
         y_first_sampled_point   = (y_min_cell + y_max_cell) / 2 
-        
+        # modify the number of sampling points if there is one sampling point is
+        # too close to the edge
+        # if (x_first_sampled_point - x_min_cell) < (0.915 / 2):
+        #     num_of_sampling = num_of_sampling - 2
+        #     x_first_sampled_point   = (x_min_cell + x_max_cell) / 2 - 0.915 * (num_of_sampling - 1) / 2
+        #     for color_index, colors in enumerate(cells[6]):
+        #         # if it is not the first one or the last one
+        #         if (color_index != 0 and color_index != (len(cells[6]) - 1)):
+        #             x_sampled.append(x_first_sampled_point + 0.915 * color_index)
+        #             y_sampled.append(y_first_sampled_point)
+        #             ref_sampled.append(float(colors))
+        # else:
+        #     for color_index, colors in enumerate(cells[6]):
+        #         x_sampled.append(x_first_sampled_point + 0.915 * color_index)
+        #         y_sampled.append(y_first_sampled_point)
+        #         ref_sampled.append(float(colors))
+        # No matter how close the sampling point to the edge is, I still take
+        # the point
         for color_index, colors in enumerate(cells[6]):
             x_sampled.append(x_first_sampled_point + 0.915 * color_index)
             y_sampled.append(y_first_sampled_point)
@@ -102,14 +136,41 @@ for cells in coords:
 x_interpolate           = np.arange(xmin,xmax,xstep)
 y_interpolate           = np.arange(ymin,ymax,ystep)
 X, Y                    = np.meshgrid(x_interpolate, y_interpolate)
-print [len(x_sampled), len(y_sampled), len(ref_sampled)]
+#print [len(x_sampled), len(y_sampled), len(ref_sampled)]
 
-ref_interpolate_func    = Rbf(x_sampled, y_sampled, ref_sampled, method='inverse')
-ref_interpolate         = ref_interpolate_func(X, Y)
+ref_interpolate_func    = interpolate.interp2d(x_sampled, y_sampled, ref_sampled, kind='cubic')
+ref_interpolate         = ref_interpolate_func(x_interpolate, y_interpolate)
+
+max_post_interpolate    = 0
+min_post_interpolate    = 999
+for rows in ref_interpolate:
+    for elements in rows:
+        if elements < min_post_interpolate:
+            min_post_interpolate = elements
+        if elements > max_post_interpolate:
+            max_post_interpolate = elements
+
+scalar_value    = (max_val - min_val) / (max_post_interpolate - min_post_interpolate)
+
+# normalized_ref_interpolate  = np.asarray([[(items - min_post_interpolate)\
+# * scalar_value + min_val for items in row] for row in ref_interpolate])
+
+# save the matrix to a file
+imaged_matrix_file  = extracted_file[0:-3] + "npy"
+np.save(imaged_matrix_file, ref_interpolate)
 
 # plot
-plt.pcolor(X, Y, ref_interpolate)
+#plt.pcolor(x_interpolate, y_interpolate, normalized_ref_interpolate)
+plt.pcolor(x_interpolate, y_interpolate, ref_interpolate, vmin=min_post_interpolate, vmax=max_post_interpolate)
+plt.scatter(x_sampled, y_sampled, 100, ref_sampled)
 plt.colorbar()
-plt.show()
+plt.xlim([xmin, xmax])
+plt.ylim([ymin, ymax - ystep])
 
+# savefig_name = PdfPages('example.pdf')
+# plt.savefig(savefig_name, format='pdf', bbox_inches='tight')
+# savefig_name.close()
+
+plt.show()
+plt.close()
 
